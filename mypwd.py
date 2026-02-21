@@ -90,6 +90,22 @@ def add_password(tag, username, password):
     print(f"Password for '{tag}' saved successfully.")
 
 
+def read_password(password_stdin=False):
+    """Read a password from stdin or an interactive prompt."""
+    if password_stdin:
+        password = sys.stdin.readline().rstrip("\n")
+        if not password:
+            print("Error: No password provided on stdin.", file=sys.stderr)
+            sys.exit(1)
+        return password
+
+    password = getpass.getpass("Entry password: ")
+    if not password:
+        print("Error: Password cannot be empty.", file=sys.stderr)
+        sys.exit(1)
+    return password
+
+
 def get_password(tag, output=False):
     """Retrieve a password"""
     cipher = get_master_key()
@@ -142,9 +158,18 @@ def main():
     parser = argparse.ArgumentParser(description="Terminal-based password manager")
     parser.add_argument(
         "--add",
-        nargs=3,
-        metavar=("<tag>", "<username>", "<password>"),
+        metavar="<tag>",
         help="Add or update a password",
+    )
+    parser.add_argument(
+        "--username",
+        metavar="<username>",
+        help="Username for the password entry (use with --add)",
+    )
+    parser.add_argument(
+        "--password-stdin",
+        action="store_true",
+        help="Read entry password from stdin instead of prompt (use with --add)",
     )
     parser.add_argument(
         "--get", metavar="<tag>", help="Get a password (copies to clipboard by default)"
@@ -158,8 +183,15 @@ def main():
 
     args = parser.parse_args()
 
+    if args.password_stdin and not args.add:
+        parser.error("--password-stdin can only be used with --add")
+
     if args.add:
-        tag, username, password = args.add
+        if not args.username:
+            parser.error("--username is required when using --add")
+        tag = args.add
+        username = args.username
+        password = read_password(password_stdin=args.password_stdin)
         add_password(tag, username, password)
 
     elif args.get:

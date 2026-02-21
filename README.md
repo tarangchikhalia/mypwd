@@ -70,9 +70,14 @@ source ~/.bashrc
 
 ### Add a password
 ```bash
-mypwd --add github octocat mySecureP@ssw0rd
+mypwd --add github --username octocat
 ```
-The `--add` command now expects a tag, username, and password (in that order). The username/password pair is encrypted and saved together so it is easy to retrieve both later.
+You will be prompted securely for the entry password.  
+To provide it non-interactively:
+```bash
+printf '%s\n' 'mySecureP@ssw0rd' | mypwd --add github --username octocat --password-stdin
+```
+The username/password pair is encrypted and saved together so it is easy to retrieve both later.
 
 ### Get password (copy to clipboard)
 ```bash

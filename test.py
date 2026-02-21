@@ -76,6 +76,47 @@ class MyPwdTests(unittest.TestCase):
         error_output = buffer.getvalue()
         self.assertIn("Error: No password found for tag 'github'", error_output)
 
+    def test_main_add_uses_prompt_password(self):
+        argv = [
+            "mypwd.py",
+            "--add",
+            "github",
+            "--username",
+            "octocat",
+        ]
+        with patch.object(sys, "argv", argv), \
+            patch("mypwd.getpass.getpass", return_value="prompt-secret"), \
+            patch("mypwd.add_password") as mock_add:
+            mypwd.main()
+
+        mock_add.assert_called_once_with("github", "octocat", "prompt-secret")
+
+    def test_main_add_uses_stdin_password(self):
+        argv = [
+            "mypwd.py",
+            "--add",
+            "github",
+            "--username",
+            "octocat",
+            "--password-stdin",
+        ]
+        with patch.object(sys, "argv", argv), \
+            patch("sys.stdin", io.StringIO("stdin-secret\n")), \
+            patch("mypwd.add_password") as mock_add:
+            mypwd.main()
+
+        mock_add.assert_called_once_with("github", "octocat", "stdin-secret")
+
+    def test_main_add_requires_username(self):
+        argv = ["mypwd.py", "--add", "github"]
+        buffer = io.StringIO()
+        with patch.object(sys, "argv", argv), redirect_stderr(buffer), self.assertRaises(
+            SystemExit
+        ):
+            mypwd.main()
+
+        self.assertIn("--username is required when using --add", buffer.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()
