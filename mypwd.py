@@ -9,6 +9,7 @@ import json
 import getpass
 import argparse
 import base64
+import stat
 from pathlib import Path
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
@@ -18,21 +19,53 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 STORAGE_DIR = Path.home() / ".mypwd"
 STORAGE_FILE = STORAGE_DIR / "passwords.enc"
 SALT_FILE = STORAGE_DIR / "salt"
+STORAGE_DIR_MODE = 0o700
+STORAGE_FILE_MODE = 0o600
+
+
+def ensure_storage_dir_secure():
+    """Create storage directory if needed and enforce restrictive permissions."""
+    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+    os.chmod(STORAGE_DIR, STORAGE_DIR_MODE)
+    current_mode = stat.S_IMODE(STORAGE_DIR.stat().st_mode)
+    if current_mode != STORAGE_DIR_MODE:
+        print(
+            f"Error: Insecure permissions on '{STORAGE_DIR}'. Expected 0700.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+def enforce_file_mode(path, expected_mode):
+    """Enforce strict file permissions and fail closed if they cannot be applied."""
+    os.chmod(path, expected_mode)
+    current_mode = stat.S_IMODE(path.stat().st_mode)
+    if current_mode != expected_mode:
+        print(
+            f"Error: Insecure permissions on '{path}'. Expected {expected_mode:o}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 def get_master_key():
     """Prompt for master password and derive encryption key"""
     master_password = getpass.getpass("Master password: ")
+    ensure_storage_dir_secure()
 
     # Load or create salt
     if SALT_FILE.exists():
+        enforce_file_mode(SALT_FILE, STORAGE_FILE_MODE)
         with open(SALT_FILE, "rb") as f:
             salt = f.read()
     else:
-        STORAGE_DIR.mkdir(parents=True, exist_ok=True)
         salt = os.urandom(16)
-        with open(SALT_FILE, "wb") as f:
+        with os.fdopen(
+            os.open(SALT_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, STORAGE_FILE_MODE),
+            "wb",
+        ) as f:
             f.write(salt)
+        enforce_file_mode(SALT_FILE, STORAGE_FILE_MODE)
 
     # Derive key using PBKDF2
     kdf = PBKDF2HMAC(
@@ -50,6 +83,7 @@ def load_passwords(cipher):
     if not STORAGE_FILE.exists():
         return {}
 
+    enforce_file_mode(STORAGE_FILE, STORAGE_FILE_MODE)
     try:
         with open(STORAGE_FILE, "rb") as f:
             encrypted_data = f.read()
@@ -69,13 +103,17 @@ def load_passwords(cipher):
 
 def save_passwords(cipher, passwords):
     """Encrypt and save password storage"""
-    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+    ensure_storage_dir_secure()
 
     json_data = json.dumps(passwords).encode()
     encrypted_data = cipher.encrypt(json_data)
 
-    with open(STORAGE_FILE, "wb") as f:
+    with os.fdopen(
+        os.open(STORAGE_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, STORAGE_FILE_MODE),
+        "wb",
+    ) as f:
         f.write(encrypted_data)
+    enforce_file_mode(STORAGE_FILE, STORAGE_FILE_MODE)
 
 
 def add_password(tag, username, password):

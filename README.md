@@ -118,6 +118,7 @@ mypwd --list
 
 - **Password database**: `~/.mypwd/passwords.enc`
 - **Salt file**: `~/.mypwd/salt`
+- **Permissions**: `~/.mypwd` is enforced as `0700`; stored files are enforced as `0600`
 
 ## Uninstallation
 

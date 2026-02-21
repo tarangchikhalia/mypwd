@@ -1,8 +1,11 @@
 import io
+import stat
 import sys
+import tempfile
 import types
 import unittest
 from contextlib import redirect_stdout, redirect_stderr
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import mypwd
@@ -116,6 +119,30 @@ class MyPwdTests(unittest.TestCase):
             mypwd.main()
 
         self.assertIn("--username is required when using --add", buffer.getvalue())
+
+    def test_ensure_storage_dir_secure_uses_0700(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            secure_dir = Path(tmpdir) / "mypwd"
+            with patch.object(mypwd, "STORAGE_DIR", secure_dir):
+                mypwd.ensure_storage_dir_secure()
+                mode = stat.S_IMODE(secure_dir.stat().st_mode)
+                self.assertEqual(mode, mypwd.STORAGE_DIR_MODE)
+
+    def test_save_passwords_uses_0600_file_permissions(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            secure_dir = Path(tmpdir) / "mypwd"
+            storage_file = secure_dir / "passwords.enc"
+            cipher = MagicMock()
+            cipher.encrypt.return_value = b"encrypted"
+            with patch.object(mypwd, "STORAGE_DIR", secure_dir), patch.object(
+                mypwd, "STORAGE_FILE", storage_file
+            ):
+                mypwd.save_passwords(cipher, {"github": "octocat:swordfish"})
+
+            dir_mode = stat.S_IMODE(secure_dir.stat().st_mode)
+            file_mode = stat.S_IMODE(storage_file.stat().st_mode)
+            self.assertEqual(dir_mode, mypwd.STORAGE_DIR_MODE)
+            self.assertEqual(file_mode, mypwd.STORAGE_FILE_MODE)
 
 
 if __name__ == "__main__":
