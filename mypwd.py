@@ -88,6 +88,12 @@ def get_scrypt_config():
 def load_or_create_kdf_config():
     """Load existing KDF config or create new scrypt metadata for first use."""
     if not SALT_FILE.exists():
+        if STORAGE_FILE.exists():
+            print(
+                "Error: Salt file is missing while password database exists. Restore the original salt file before continuing.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         return get_scrypt_config(), False
 
     enforce_file_mode(SALT_FILE, STORAGE_FILE_MODE)

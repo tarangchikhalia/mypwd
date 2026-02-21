@@ -128,6 +128,7 @@ Existing databases created with legacy PBKDF2 salt format remain readable for ba
 - Choose a strong master password (12+ characters, mixed case, numbers, symbols)
 - The password file is encrypted, but protect your system from unauthorized access
 - Back up `~/.mypwd/` periodically if you want to preserve your passwords
+- Keep `passwords.enc` and `salt` together during backups/restores; `mypwd` refuses to run if the database exists without its salt metadata
 - If you forget the master password, there's no recovery - you'll lose all stored passwords
 
 ## File locations

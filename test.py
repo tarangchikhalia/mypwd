@@ -162,10 +162,13 @@ class MyPwdTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             secure_dir = Path(tmpdir) / "mypwd"
             salt_file = secure_dir / "salt"
+            storage_file = secure_dir / "passwords.enc"
             fake_scrypt = MagicMock()
             fake_scrypt.derive.return_value = b"x" * 32
             with patch.object(mypwd, "STORAGE_DIR", secure_dir), patch.object(
                 mypwd, "SALT_FILE", salt_file
+            ), patch.object(
+                mypwd, "STORAGE_FILE", storage_file
             ), patch("mypwd.getpass.getpass", return_value="MasterPass123"), patch(
                 "mypwd.Scrypt", return_value=fake_scrypt
             ) as mock_scrypt, patch("mypwd.Fernet") as mock_fernet:
@@ -187,11 +190,14 @@ class MyPwdTests(unittest.TestCase):
             secure_dir = Path(tmpdir) / "mypwd"
             secure_dir.mkdir(parents=True, exist_ok=True)
             salt_file = secure_dir / "salt"
+            storage_file = secure_dir / "passwords.enc"
             salt_file.write_bytes(b"legacy-salt-16byt")
             fake_pbkdf2 = MagicMock()
             fake_pbkdf2.derive.return_value = b"y" * 32
             with patch.object(mypwd, "STORAGE_DIR", secure_dir), patch.object(
                 mypwd, "SALT_FILE", salt_file
+            ), patch.object(
+                mypwd, "STORAGE_FILE", storage_file
             ), patch("mypwd.getpass.getpass", return_value="MasterPass123"), patch(
                 "mypwd.PBKDF2HMAC", return_value=fake_pbkdf2
             ) as mock_pbkdf2, patch("mypwd.Scrypt") as mock_scrypt, patch(
@@ -201,6 +207,27 @@ class MyPwdTests(unittest.TestCase):
 
             self.assertTrue(mock_pbkdf2.called)
             self.assertFalse(mock_scrypt.called)
+
+    def test_get_master_key_fails_if_salt_missing_with_existing_database(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            secure_dir = Path(tmpdir) / "mypwd"
+            secure_dir.mkdir(parents=True, exist_ok=True)
+            storage_file = secure_dir / "passwords.enc"
+            storage_file.write_bytes(b"encrypted")
+            salt_file = secure_dir / "salt"
+
+            error_output = io.StringIO()
+            with patch.object(mypwd, "STORAGE_DIR", secure_dir), patch.object(
+                mypwd, "STORAGE_FILE", storage_file
+            ), patch.object(mypwd, "SALT_FILE", salt_file), patch(
+                "mypwd.getpass.getpass", return_value="MasterPass123"
+            ), redirect_stderr(error_output), self.assertRaises(SystemExit):
+                mypwd.get_master_key()
+
+            self.assertIn(
+                "Salt file is missing while password database exists",
+                error_output.getvalue(),
+            )
 
 
 if __name__ == "__main__":
