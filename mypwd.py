@@ -78,12 +78,13 @@ def save_passwords(cipher, passwords):
         f.write(encrypted_data)
 
 
-def add_password(tag, password):
+def add_password(tag, username, password):
     """Add or update a password"""
     cipher = get_master_key()
     passwords = load_passwords(cipher)
 
-    passwords[tag] = password
+    username_password = ":".join([username, password])
+    passwords[tag] = username_password
     save_passwords(cipher, passwords)
 
     print(f"Password for '{tag}' saved successfully.")
@@ -98,16 +99,22 @@ def get_password(tag, output=False):
         print(f"Error: No password found for tag '{tag}'", file=sys.stderr)
         sys.exit(1)
 
-    password = passwords[tag]
+    username_password = passwords[tag]
+
+    username, password = username_password.split(
+        ":", 1
+    )  # split the username password pair with first occurance of ":"
 
     if output:
-        print(password)
+        print(f"Username: {username}")
+        print(f"Password: {password}")
     else:
         # Copy to clipboard
         try:
             import pyperclip
 
             pyperclip.copy(password)
+            print(f"Username for '{tag}' is '{username}'")
             print(f"Password for '{tag}' copied to clipboard.")
         except ImportError:
             print(
@@ -135,8 +142,8 @@ def main():
     parser = argparse.ArgumentParser(description="Terminal-based password manager")
     parser.add_argument(
         "--add",
-        nargs=2,
-        metavar=("<tag>", "<password>"),
+        nargs=3,
+        metavar=("<tag>", "<username>", "<password>"),
         help="Add or update a password",
     )
     parser.add_argument(
@@ -152,8 +159,8 @@ def main():
     args = parser.parse_args()
 
     if args.add:
-        tag, password = args.add
-        add_password(tag, password)
+        tag, username, password = args.add
+        add_password(tag, username, password)
 
     elif args.get:
         get_password(args.get, output=args.output)

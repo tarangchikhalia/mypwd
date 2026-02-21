@@ -8,6 +8,7 @@ Secure, terminal-based password manager with AES-256 encryption for Linux and ma
 - **PBKDF2 key derivation** with 100,000 iterations
 - **Master password protection** - one password to access all stored passwords
 - **Local storage** - passwords stored in `~/.mypwd/`
+- **Username tracking** - store usernames together with passwords for each tag
 - **Clipboard integration** - automatically copies passwords
 - **Simple CLI interface**
 - **Cross-platform** - works on Linux and macOS
@@ -69,18 +70,21 @@ source ~/.bashrc
 
 ### Add a password
 ```bash
-mypwd --add github mySecureP@ssw0rd
+mypwd --add github octocat mySecureP@ssw0rd
 ```
+The `--add` command now expects a tag, username, and password (in that order). The username/password pair is encrypted and saved together so it is easy to retrieve both later.
 
 ### Get password (copy to clipboard)
 ```bash
 mypwd --get github
 ```
+Outputs the username and copies the password to your clipboard.
 
 ### Get password (output to terminal)
 ```bash
 mypwd --get github --output
 ```
+Prints both the username and password without touching the clipboard.
 
 ### List all stored tags
 ```bash
@@ -93,7 +97,7 @@ mypwd --list
 
 2. **Encryption**: Passwords are encrypted using AES-256 via Fernet (symmetric encryption). The encryption key is derived from your master password using PBKDF2 with SHA-256 and 100,000 iterations.
 
-3. **Storage**: Encrypted passwords are stored in `~/.mypwd/passwords.enc` and the salt in `~/.mypwd/salt`.
+3. **Storage**: Encrypted `username:password` strings are stored in `~/.mypwd/passwords.enc` and the salt in `~/.mypwd/salt`.
 
 4. **Security**: The master password is never stored. Only the salt (used for key derivation) is stored on disk.
 
