@@ -53,7 +53,7 @@ class MyPwdTests(unittest.TestCase):
         self.assertIn("Username: octocat", output)
         self.assertIn("Password: swordfish", output)
 
-    def test_get_password_without_output_uses_clipboard(self):
+    def test_get_password_with_clipboard_uses_clipboard(self):
         fake_pyperclip = types.ModuleType("pyperclip")
         fake_pyperclip.copy = MagicMock()
 
@@ -62,12 +62,24 @@ class MyPwdTests(unittest.TestCase):
             patch.dict(sys.modules, {"pyperclip": fake_pyperclip}):
             buffer = io.StringIO()
             with redirect_stdout(buffer):
-                mypwd.get_password("github")
+                mypwd.get_password("github", clipboard=True)
 
         fake_pyperclip.copy.assert_called_once_with("swordfish")
         output = buffer.getvalue()
         self.assertIn("Username for 'github' is 'octocat'", output)
         self.assertIn("Password for 'github' copied to clipboard.", output)
+
+    def test_get_password_without_output_or_clipboard_shows_username_only(self):
+        with patch("mypwd.get_master_key"), patch(
+            "mypwd.load_passwords", return_value={"github": "octocat:swordfish"}
+        ):
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                mypwd.get_password("github")
+
+        output = buffer.getvalue()
+        self.assertIn("Username: octocat", output)
+        self.assertIn("Password not copied. Use --output or --clipboard.", output)
 
     def test_get_password_missing_tag_exits_with_error(self):
         with patch("mypwd.get_master_key"), \

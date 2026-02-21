@@ -144,7 +144,7 @@ def read_password(password_stdin=False):
     return password
 
 
-def get_password(tag, output=False):
+def get_password(tag, output=False, clipboard=False):
     """Retrieve a password"""
     cipher = get_master_key()
     passwords = load_passwords(cipher)
@@ -162,7 +162,7 @@ def get_password(tag, output=False):
     if output:
         print(f"Username: {username}")
         print(f"Password: {password}")
-    else:
+    elif clipboard:
         # Copy to clipboard
         try:
             import pyperclip
@@ -176,6 +176,9 @@ def get_password(tag, output=False):
                 file=sys.stderr,
             )
             print(f"Password: {password}")
+    else:
+        print(f"Username: {username}")
+        print("Password not copied. Use --output or --clipboard.")
 
 
 def list_tags():
@@ -210,12 +213,17 @@ def main():
         help="Read entry password from stdin instead of prompt (use with --add)",
     )
     parser.add_argument(
-        "--get", metavar="<tag>", help="Get a password (copies to clipboard by default)"
+        "--get", metavar="<tag>", help="Get credentials for a tag"
     )
     parser.add_argument(
         "--output",
         action="store_true",
-        help="Output password to terminal instead of clipboard (use with --get)",
+        help="Output password to terminal (use with --get)",
+    )
+    parser.add_argument(
+        "--clipboard",
+        action="store_true",
+        help="Copy password to clipboard (use with --get)",
     )
     parser.add_argument("--list", action="store_true", help="List all stored tags")
 
@@ -223,6 +231,8 @@ def main():
 
     if args.password_stdin and not args.add:
         parser.error("--password-stdin can only be used with --add")
+    if args.output and args.clipboard:
+        parser.error("--output and --clipboard cannot be used together")
 
     if args.add:
         if not args.username:
@@ -233,7 +243,7 @@ def main():
         add_password(tag, username, password)
 
     elif args.get:
-        get_password(args.get, output=args.output)
+        get_password(args.get, output=args.output, clipboard=args.clipboard)
 
     elif args.list:
         list_tags()

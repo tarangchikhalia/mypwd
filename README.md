@@ -9,7 +9,7 @@ Secure, terminal-based password manager with AES-256 encryption for Linux and ma
 - **Master password protection** - one password to access all stored passwords
 - **Local storage** - passwords stored in `~/.mypwd/`
 - **Username tracking** - store usernames together with passwords for each tag
-- **Clipboard integration** - automatically copies passwords
+- **Clipboard integration** - optional copy to clipboard on explicit request
 - **Simple CLI interface**
 - **Cross-platform** - works on Linux and macOS
 
@@ -81,7 +81,7 @@ The username/password pair is encrypted and saved together so it is easy to retr
 
 ### Get password (copy to clipboard)
 ```bash
-mypwd --get github
+mypwd --get github --clipboard
 ```
 Outputs the username and copies the password to your clipboard.
 
@@ -90,6 +90,12 @@ Outputs the username and copies the password to your clipboard.
 mypwd --get github --output
 ```
 Prints both the username and password without touching the clipboard.
+
+### Get username only (default)
+```bash
+mypwd --get github
+```
+Prints only the username and does not copy the password unless you pass `--clipboard`.
 
 ### List all stored tags
 ```bash
