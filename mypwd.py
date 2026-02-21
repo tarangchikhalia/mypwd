@@ -26,6 +26,7 @@ LEGACY_PBKDF2_ITERATIONS = 100000
 DEFAULT_SCRYPT_N = 2**15
 DEFAULT_SCRYPT_R = 8
 DEFAULT_SCRYPT_P = 1
+DEBUG = False
 
 
 def ensure_storage_dir_secure():
@@ -211,10 +212,9 @@ def load_passwords(cipher):
         decrypted_data = cipher.decrypt(encrypted_data)
         return json.loads(decrypted_data.decode())
     except Exception as e:
-        print(
-            f"Error: Failed to decrypt. Wrong master password or corrupted file.\n Error: {e}",
-            file=sys.stderr,
-        )
+        print("Error: Failed to decrypt. Wrong master password or corrupted file.", file=sys.stderr)
+        if DEBUG:
+            print(f"Debug: {e}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -337,9 +337,16 @@ def main():
         action="store_true",
         help="Copy password to clipboard (use with --get)",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Show internal error details for troubleshooting",
+    )
     parser.add_argument("--list", action="store_true", help="List all stored tags")
 
     args = parser.parse_args()
+    global DEBUG
+    DEBUG = args.debug
 
     if args.password_stdin and not args.add:
         parser.error("--password-stdin can only be used with --add")

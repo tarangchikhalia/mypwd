@@ -102,6 +102,12 @@ Prints only the username and does not copy the password unless you pass `--clipb
 mypwd --list
 ```
 
+### Debug errors (optional)
+```bash
+mypwd --list --debug
+```
+By default, decryption errors are generic. `--debug` includes internal exception details for local troubleshooting.
+
 ## How it works
 
 1. **Master password**: On first use, you create a master password. This password is used to encrypt all stored passwords.

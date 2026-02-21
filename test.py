@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+import os
 import stat
 import sys
 import tempfile
@@ -92,6 +93,44 @@ class MyPwdTests(unittest.TestCase):
 
         error_output = buffer.getvalue()
         self.assertIn("Error: No password found for tag 'github'", error_output)
+
+    def test_load_passwords_hides_internal_exception_without_debug(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            secure_dir = Path(tmpdir) / "mypwd"
+            secure_dir.mkdir(parents=True, exist_ok=True)
+            storage_file = secure_dir / "passwords.enc"
+            storage_file.write_bytes(b"encrypted")
+            os.chmod(storage_file, mypwd.STORAGE_FILE_MODE)
+            cipher = MagicMock()
+            cipher.decrypt.side_effect = ValueError("sensitive details")
+            error_output = io.StringIO()
+            with patch.object(mypwd, "STORAGE_FILE", storage_file), patch.object(
+                mypwd, "DEBUG", False
+            ), redirect_stderr(error_output), self.assertRaises(SystemExit):
+                mypwd.load_passwords(cipher)
+
+            text = error_output.getvalue()
+            self.assertIn("Failed to decrypt", text)
+            self.assertNotIn("sensitive details", text)
+
+    def test_load_passwords_shows_internal_exception_with_debug(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            secure_dir = Path(tmpdir) / "mypwd"
+            secure_dir.mkdir(parents=True, exist_ok=True)
+            storage_file = secure_dir / "passwords.enc"
+            storage_file.write_bytes(b"encrypted")
+            os.chmod(storage_file, mypwd.STORAGE_FILE_MODE)
+            cipher = MagicMock()
+            cipher.decrypt.side_effect = ValueError("sensitive details")
+            error_output = io.StringIO()
+            with patch.object(mypwd, "STORAGE_FILE", storage_file), patch.object(
+                mypwd, "DEBUG", True
+            ), redirect_stderr(error_output), self.assertRaises(SystemExit):
+                mypwd.load_passwords(cipher)
+
+            text = error_output.getvalue()
+            self.assertIn("Failed to decrypt", text)
+            self.assertIn("sensitive details", text)
 
     def test_main_add_uses_prompt_password(self):
         argv = [
