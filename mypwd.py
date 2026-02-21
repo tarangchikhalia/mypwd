@@ -53,6 +53,27 @@ def enforce_file_mode(path, expected_mode):
         sys.exit(1)
 
 
+def atomic_write_bytes(path, data, mode=STORAGE_FILE_MODE):
+    """Write bytes atomically via temp file + fsync + rename."""
+    temp_path = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    fd = os.open(temp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, path)
+        enforce_file_mode(path, mode)
+        dir_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
+
 def get_scrypt_parameter(env_name, default_value):
     """Read and validate a positive integer KDF parameter from environment."""
     value = os.environ.get(env_name, str(default_value))
@@ -138,12 +159,7 @@ def persist_kdf_config(kdf_config):
         "r": kdf_config["r"],
         "p": kdf_config["p"],
     }
-    with os.fdopen(
-        os.open(SALT_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, STORAGE_FILE_MODE),
-        "wb",
-    ) as f:
-        f.write(json.dumps(serializable).encode())
-    enforce_file_mode(SALT_FILE, STORAGE_FILE_MODE)
+    atomic_write_bytes(SALT_FILE, json.dumps(serializable).encode(), STORAGE_FILE_MODE)
 
 
 def derive_key(master_password, kdf_config):
@@ -209,12 +225,7 @@ def save_passwords(cipher, passwords):
     json_data = json.dumps(passwords).encode()
     encrypted_data = cipher.encrypt(json_data)
 
-    with os.fdopen(
-        os.open(STORAGE_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, STORAGE_FILE_MODE),
-        "wb",
-    ) as f:
-        f.write(encrypted_data)
-    enforce_file_mode(STORAGE_FILE, STORAGE_FILE_MODE)
+    atomic_write_bytes(STORAGE_FILE, encrypted_data, STORAGE_FILE_MODE)
 
 
 def add_password(tag, username, password):

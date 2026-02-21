@@ -129,6 +129,7 @@ Existing databases created with legacy PBKDF2 salt format remain readable for ba
 - The password file is encrypted, but protect your system from unauthorized access
 - Back up `~/.mypwd/` periodically if you want to preserve your passwords
 - Keep `passwords.enc` and `salt` together during backups/restores; `mypwd` refuses to run if the database exists without its salt metadata
+- Database and salt metadata updates use atomic replace writes to reduce corruption risk on interruptions
 - If you forget the master password, there's no recovery - you'll lose all stored passwords
 
 ## File locations

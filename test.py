@@ -147,16 +147,19 @@ class MyPwdTests(unittest.TestCase):
             secure_dir = Path(tmpdir) / "mypwd"
             storage_file = secure_dir / "passwords.enc"
             cipher = MagicMock()
-            cipher.encrypt.return_value = b"encrypted"
+            cipher.encrypt.side_effect = [b"encrypted-v1", b"encrypted-v2"]
             with patch.object(mypwd, "STORAGE_DIR", secure_dir), patch.object(
                 mypwd, "STORAGE_FILE", storage_file
             ):
                 mypwd.save_passwords(cipher, {"github": "octocat:swordfish"})
+                mypwd.save_passwords(cipher, {"github": "octocat:updated"})
 
             dir_mode = stat.S_IMODE(secure_dir.stat().st_mode)
             file_mode = stat.S_IMODE(storage_file.stat().st_mode)
             self.assertEqual(dir_mode, mypwd.STORAGE_DIR_MODE)
             self.assertEqual(file_mode, mypwd.STORAGE_FILE_MODE)
+            self.assertEqual(storage_file.read_bytes(), b"encrypted-v2")
+            self.assertEqual(list(secure_dir.glob(".passwords.enc.tmp-*")), [])
 
     def test_get_master_key_creates_scrypt_metadata_by_default(self):
         with tempfile.TemporaryDirectory() as tmpdir:
