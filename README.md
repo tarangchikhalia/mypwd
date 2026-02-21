@@ -5,7 +5,7 @@ Secure, terminal-based password manager with Fernet authenticated encryption for
 ## Features
 
 - **Fernet authenticated encryption** (AES-128-CBC + HMAC-SHA256)
-- **PBKDF2 key derivation** with 100,000 iterations
+- **scrypt key derivation** (memory-hard) with configurable parameters
 - **Master password protection** - one password to access all stored passwords
 - **Local storage** - passwords stored in `~/.mypwd/`
 - **Username tracking** - store usernames together with passwords for each tag
@@ -106,11 +106,21 @@ mypwd --list
 
 1. **Master password**: On first use, you create a master password. This password is used to encrypt all stored passwords.
 
-2. **Encryption**: Passwords are encrypted using Fernet authenticated encryption (AES-128-CBC + HMAC-SHA256). The encryption key is derived from your master password.
+2. **Encryption**: Passwords are encrypted using Fernet authenticated encryption (AES-128-CBC + HMAC-SHA256). The encryption key is derived from your master password using scrypt.
 
 3. **Storage**: Encrypted `username:password` strings are stored in `~/.mypwd/passwords.enc` and the salt in `~/.mypwd/salt`.
 
 4. **Security**: The master password is never stored. Only the salt (used for key derivation) is stored on disk.
+
+### KDF tuning
+
+You can tune scrypt settings through environment variables before running `mypwd`:
+
+- `MYPWD_SCRYPT_N` (default: `32768`, must be a power of two)
+- `MYPWD_SCRYPT_R` (default: `8`)
+- `MYPWD_SCRYPT_P` (default: `1`)
+
+Existing databases created with legacy PBKDF2 salt format remain readable for backward compatibility.
 
 ## Security notes
 

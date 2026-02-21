@@ -14,6 +14,7 @@ from pathlib import Path
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 # Storage location
 STORAGE_DIR = Path.home() / ".mypwd"
@@ -21,6 +22,10 @@ STORAGE_FILE = STORAGE_DIR / "passwords.enc"
 SALT_FILE = STORAGE_DIR / "salt"
 STORAGE_DIR_MODE = 0o700
 STORAGE_FILE_MODE = 0o600
+LEGACY_PBKDF2_ITERATIONS = 100000
+DEFAULT_SCRYPT_N = 2**15
+DEFAULT_SCRYPT_R = 8
+DEFAULT_SCRYPT_P = 1
 
 
 def ensure_storage_dir_secure():
@@ -48,33 +53,123 @@ def enforce_file_mode(path, expected_mode):
         sys.exit(1)
 
 
+def get_scrypt_parameter(env_name, default_value):
+    """Read and validate a positive integer KDF parameter from environment."""
+    value = os.environ.get(env_name, str(default_value))
+    try:
+        parsed = int(value)
+    except ValueError:
+        print(f"Error: {env_name} must be an integer.", file=sys.stderr)
+        sys.exit(1)
+    if parsed <= 0:
+        print(f"Error: {env_name} must be greater than zero.", file=sys.stderr)
+        sys.exit(1)
+    return parsed
+
+
+def get_scrypt_config():
+    """Build scrypt settings for new key derivation metadata."""
+    n = get_scrypt_parameter("MYPWD_SCRYPT_N", DEFAULT_SCRYPT_N)
+    r = get_scrypt_parameter("MYPWD_SCRYPT_R", DEFAULT_SCRYPT_R)
+    p = get_scrypt_parameter("MYPWD_SCRYPT_P", DEFAULT_SCRYPT_P)
+    if n & (n - 1):
+        print("Error: MYPWD_SCRYPT_N must be a power of two.", file=sys.stderr)
+        sys.exit(1)
+    return {
+        "version": 2,
+        "kdf": "scrypt",
+        "salt": os.urandom(16),
+        "n": n,
+        "r": r,
+        "p": p,
+    }
+
+
+def load_or_create_kdf_config():
+    """Load existing KDF config or create new scrypt metadata for first use."""
+    if not SALT_FILE.exists():
+        return get_scrypt_config(), False
+
+    enforce_file_mode(SALT_FILE, STORAGE_FILE_MODE)
+    with open(SALT_FILE, "rb") as f:
+        salt_data = f.read()
+
+    try:
+        config = json.loads(salt_data.decode())
+    except Exception:
+        config = None
+
+    if isinstance(config, dict) and config.get("kdf") == "scrypt":
+        try:
+            return {
+                "version": int(config["version"]),
+                "kdf": "scrypt",
+                "salt": base64.urlsafe_b64decode(config["salt"].encode()),
+                "n": int(config["n"]),
+                "r": int(config["r"]),
+                "p": int(config["p"]),
+            }, True
+        except Exception:
+            print("Error: Invalid KDF metadata in salt file.", file=sys.stderr)
+            sys.exit(1)
+
+    # Backward compatibility for legacy raw-salt PBKDF2 files.
+    return {
+        "version": 1,
+        "kdf": "pbkdf2",
+        "salt": salt_data,
+        "iterations": LEGACY_PBKDF2_ITERATIONS,
+    }, True
+
+
+def persist_kdf_config(kdf_config):
+    """Persist KDF metadata in the salt file."""
+    serializable = {
+        "version": kdf_config["version"],
+        "kdf": kdf_config["kdf"],
+        "salt": base64.urlsafe_b64encode(kdf_config["salt"]).decode(),
+        "n": kdf_config["n"],
+        "r": kdf_config["r"],
+        "p": kdf_config["p"],
+    }
+    with os.fdopen(
+        os.open(SALT_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, STORAGE_FILE_MODE),
+        "wb",
+    ) as f:
+        f.write(json.dumps(serializable).encode())
+    enforce_file_mode(SALT_FILE, STORAGE_FILE_MODE)
+
+
+def derive_key(master_password, kdf_config):
+    """Derive an encryption key from the master password."""
+    if kdf_config["kdf"] == "scrypt":
+        kdf = Scrypt(
+            salt=kdf_config["salt"],
+            length=32,
+            n=kdf_config["n"],
+            r=kdf_config["r"],
+            p=kdf_config["p"],
+        )
+    else:
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=kdf_config["salt"],
+            iterations=kdf_config["iterations"],
+        )
+    return base64.urlsafe_b64encode(kdf.derive(master_password.encode()))
+
+
 def get_master_key():
     """Prompt for master password and derive encryption key"""
     master_password = getpass.getpass("Master password: ")
     ensure_storage_dir_secure()
 
-    # Load or create salt
-    if SALT_FILE.exists():
-        enforce_file_mode(SALT_FILE, STORAGE_FILE_MODE)
-        with open(SALT_FILE, "rb") as f:
-            salt = f.read()
-    else:
-        salt = os.urandom(16)
-        with os.fdopen(
-            os.open(SALT_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, STORAGE_FILE_MODE),
-            "wb",
-        ) as f:
-            f.write(salt)
-        enforce_file_mode(SALT_FILE, STORAGE_FILE_MODE)
+    kdf_config, exists = load_or_create_kdf_config()
+    if not exists:
+        persist_kdf_config(kdf_config)
 
-    # Derive key using PBKDF2
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=100000,
-    )
-    key = base64.urlsafe_b64encode(kdf.derive(master_password.encode()))
+    key = derive_key(master_password, kdf_config)
     return Fernet(key)
 
 

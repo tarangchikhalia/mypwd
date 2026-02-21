@@ -1,4 +1,6 @@
+import base64
 import io
+import json
 import stat
 import sys
 import tempfile
@@ -155,6 +157,50 @@ class MyPwdTests(unittest.TestCase):
             file_mode = stat.S_IMODE(storage_file.stat().st_mode)
             self.assertEqual(dir_mode, mypwd.STORAGE_DIR_MODE)
             self.assertEqual(file_mode, mypwd.STORAGE_FILE_MODE)
+
+    def test_get_master_key_creates_scrypt_metadata_by_default(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            secure_dir = Path(tmpdir) / "mypwd"
+            salt_file = secure_dir / "salt"
+            fake_scrypt = MagicMock()
+            fake_scrypt.derive.return_value = b"x" * 32
+            with patch.object(mypwd, "STORAGE_DIR", secure_dir), patch.object(
+                mypwd, "SALT_FILE", salt_file
+            ), patch("mypwd.getpass.getpass", return_value="MasterPass123"), patch(
+                "mypwd.Scrypt", return_value=fake_scrypt
+            ) as mock_scrypt, patch("mypwd.Fernet") as mock_fernet:
+                mypwd.get_master_key()
+
+            self.assertTrue(salt_file.exists())
+            metadata = json.loads(salt_file.read_text())
+            self.assertEqual(metadata["kdf"], "scrypt")
+            self.assertEqual(metadata["version"], 2)
+            self.assertEqual(metadata["n"], mypwd.DEFAULT_SCRYPT_N)
+            self.assertEqual(metadata["r"], mypwd.DEFAULT_SCRYPT_R)
+            self.assertEqual(metadata["p"], mypwd.DEFAULT_SCRYPT_P)
+            self.assertEqual(len(base64.urlsafe_b64decode(metadata["salt"].encode())), 16)
+            self.assertTrue(mock_scrypt.called)
+            self.assertTrue(mock_fernet.called)
+
+    def test_get_master_key_keeps_legacy_pbkdf2_compatibility(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            secure_dir = Path(tmpdir) / "mypwd"
+            secure_dir.mkdir(parents=True, exist_ok=True)
+            salt_file = secure_dir / "salt"
+            salt_file.write_bytes(b"legacy-salt-16byt")
+            fake_pbkdf2 = MagicMock()
+            fake_pbkdf2.derive.return_value = b"y" * 32
+            with patch.object(mypwd, "STORAGE_DIR", secure_dir), patch.object(
+                mypwd, "SALT_FILE", salt_file
+            ), patch("mypwd.getpass.getpass", return_value="MasterPass123"), patch(
+                "mypwd.PBKDF2HMAC", return_value=fake_pbkdf2
+            ) as mock_pbkdf2, patch("mypwd.Scrypt") as mock_scrypt, patch(
+                "mypwd.Fernet"
+            ):
+                mypwd.get_master_key()
+
+            self.assertTrue(mock_pbkdf2.called)
+            self.assertFalse(mock_scrypt.called)
 
 
 if __name__ == "__main__":
