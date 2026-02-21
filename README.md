@@ -1,10 +1,10 @@
 # 🔑 mypwd - Terminal Password Manager
 
-Secure, terminal-based password manager with AES-256 encryption for Linux and macOS.
+Secure, terminal-based password manager with Fernet authenticated encryption for Linux and macOS.
 
 ## Features
 
-- **AES-256 encryption** using Fernet (symmetric encryption)
+- **Fernet authenticated encryption** (AES-128-CBC + HMAC-SHA256)
 - **PBKDF2 key derivation** with 100,000 iterations
 - **Master password protection** - one password to access all stored passwords
 - **Local storage** - passwords stored in `~/.mypwd/`
@@ -106,7 +106,7 @@ mypwd --list
 
 1. **Master password**: On first use, you create a master password. This password is used to encrypt all stored passwords.
 
-2. **Encryption**: Passwords are encrypted using AES-256 via Fernet (symmetric encryption). The encryption key is derived from your master password using PBKDF2 with SHA-256 and 100,000 iterations.
+2. **Encryption**: Passwords are encrypted using Fernet authenticated encryption (AES-128-CBC + HMAC-SHA256). The encryption key is derived from your master password.
 
 3. **Storage**: Encrypted `username:password` strings are stored in `~/.mypwd/passwords.enc` and the salt in `~/.mypwd/salt`.
 

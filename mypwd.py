@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Terminal-based password manager with AES-256 encryption
+Terminal-based password manager using Fernet authenticated encryption
 """
 
 import os
