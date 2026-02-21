@@ -1,4 +1,4 @@
-# mypwd - Terminal Password Manager
+# 🔑 mypwd - Terminal Password Manager
 
 Secure, terminal-based password manager with AES-256 encryption for Linux and macOS.
 
