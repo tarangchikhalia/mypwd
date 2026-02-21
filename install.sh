@@ -27,7 +27,7 @@ PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
 echo "Python version: $PYTHON_VERSION"
 
 # Install dependencies
-echo "Installing dependencies..."
+echo "Installing dependencies from pinned requirements..."
 
 if [ "$OS_TYPE" = "Mac" ]; then
     # macOS specific installation
@@ -117,8 +117,9 @@ fi
 echo "✓ Installation complete!"
 echo ""
 echo "Usage:"
-echo "  mypwd --add <tag> <password>     # Add password"
-echo "  mypwd --get <tag>                # Get password (clipboard)"
+echo "  mypwd --add <tag> --username <username>         # Add password (prompted)"
+echo "  mypwd --get <tag>                               # Get username only"
+echo "  mypwd --get <tag> --clipboard                   # Copy password to clipboard"
 echo "  mypwd --get <tag> --output       # Get password (terminal output)"
 echo "  mypwd --list                     # List all tags"
 echo ""

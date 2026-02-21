@@ -16,8 +16,8 @@ Secure, terminal-based password manager with Fernet authenticated encryption for
 ## Requirements
 
 - Python 3.6+
-- cryptography
-- pyperclip
+- `cryptography==44.0.1`
+- `pyperclip==1.9.0`
 
 ### Platform-Specific Requirements
 
@@ -39,7 +39,7 @@ Secure, terminal-based password manager with Fernet authenticated encryption for
 
 The installer will:
 1. Detect your OS (Linux or macOS)
-2. Install Python dependencies
+2. Install pinned Python dependencies from `requirements.txt`
 3. Check for clipboard utilities
 4. Create symlink in `~/.local/bin`
 5. Provide shell configuration instructions if needed
